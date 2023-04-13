@@ -45,9 +45,10 @@ class NetworkGenerator(ABC):
                 state = self.post_generate_instance(instance)
                 nx.readwrite.write_graphml(instance, filepath.resolve())
 
-                drawing_filename = self.get_drawing_filename(gen_params, random_seed)
-                drawing_path = self.graph_storage_dir / drawing_filename
-                state.draw_to_file(drawing_path)
+                # Do not need to draw the network~
+                # drawing_filename = self.get_drawing_filename(gen_params, random_seed)
+                # drawing_path = self.graph_storage_dir / drawing_filename
+                # state.draw_to_file(drawing_path)
         else:
             instance = self.generate_instance(gen_params, random_seed)
             state = self.post_generate_instance(instance)

@@ -16,14 +16,14 @@ import pprint as pp
 
 def get_run_params():
     parser = argparse.ArgumentParser(
-        description="Parameters for Training NEP-DQN"
+        description="Parameters for Evaluating NEP-DQN"
     )
 
-    parser.add_argument('--graph_model', type=str, default='BA_n_20_m_2', help="The graph model to use")
+    parser.add_argument('--graph_model', type=str, default='BA_n_20_m_2', help="The networks to train the model.")
     parser.add_argument('--edge_budget_percentage', type=float, default=1.0, help="The unit is percentage.")
-    parser.add_argument('--num_training_steps', type=int, default=-1)
-    parser.add_argument('--num_train_graphs', type=int, default=100)
-    parser.add_argument('--num_validation_graphs', type=int, default=100)
+    parser.add_argument('--ood_graph_model', type=str, default='BA_n_100_m_2', help="The OOD networks to evaluate.")
+    parser.add_argument('--ood_edge_budget_percentage', type=float, default=1.0, help="The unit is percentage.")
+    parser.add_argument('--num_test_graphs', type=int, default=128)
     parser.add_argument('--method', type=str, default='targeted_removal', help="Attack method: random_removal, or "
                                                                                "targeted_removal")
     params = parser.parse_args()
@@ -66,20 +66,9 @@ def get_training_steps(edge_budget_percentage):
 if __name__ == '__main__':
     # Read Parameters
     params = get_run_params()
-
-    # Compute num_training_steps
-    if params.num_training_steps == -1:
-        num_training_steps = get_training_steps(params.edge_budget_percentage)
-        params.num_training_steps = num_training_steps
-    else:
-        num_training_steps = params.num_training_steps
-
     pp.pprint(vars(params))
 
-    num_training_steps = params.num_training_steps
-    num_train_graphs = params.num_train_graphs
-    num_validation_graphs = params.num_validation_graphs
-    num_test_graphs = 0
+    num_test_graphs = params.num_test_graphs
 
     gen_params = get_gen_params()
     # Modify gen_params
@@ -99,6 +88,7 @@ if __name__ == '__main__':
 
     options = get_options(file_paths)
     # Modify options
+    options["restore_model"] = True
     options['model_identifier_prefix'] = params.model_identifier_prefix
 
     storage_root = Path('/experiment_data/stored_graphs')
@@ -109,7 +99,7 @@ if __name__ == '__main__':
     gen = Generator(**kwargs)
 
     train_graph_seeds, validation_graph_seeds, test_graph_seeds = NetworkGenerator.construct_network_seeds(
-        num_train_graphs, num_validation_graphs, num_test_graphs)
+        0, 0, num_test_graphs)
 
     train_graphs = gen.generate_many(gen_params, train_graph_seeds)
     validation_graphs = gen.generate_many(gen_params, validation_graph_seeds)
@@ -129,6 +119,6 @@ if __name__ == '__main__':
 
     agent = RNetDQNAgent(targ_env)
     agent.setup(options, agent.get_default_hyperparameters())
-    agent.train(train_graphs, validation_graphs, num_training_steps)
 
-    # avg_perf = agent.eval(test_graphs)
+    avg_perf = agent.eval(test_graphs)
+    print('Average Robustness Improvement: {0:.3f}'.format(avg_perf))
