@@ -1,0 +1,142 @@
+FROM ubuntu:20.04
+SHELL ["/bin/bash", "-c"]
+
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+ENV PATH /opt/conda/bin:$PATH
+
+# ------ my modification ------
+# Add extra souece
+RUN cp /etc/apt/sources.list /etc/apt/sources.list.bak
+RUN echo "deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ focal main restricted universe multiverse\n\
+     deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ focal-updates main restricted universe multiverse\n\
+     deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ focal-backports main restricted universe multiverse\n\
+     deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ focal-security main restricted universe multiverse"  \
+> /etc/apt/sources.list
+
+RUN touch /etc/apt/apt.conf.d/99verify-peer.conf \
+    && echo >>/etc/apt/apt.conf.d/99verify-peer.conf "Acquire { https::Verify-Peer false }"
+# ------ my modification ------
+
+RUN apt-get update --fix-missing && apt-get install -y aptitude
+
+
+#RUN apt-get update --fix-missing && apt-get install -y wget bzip2 ca-certificates \
+#    libglib2.0-0 libxext6 libsm6 libxrender1 \
+#    git mercurial subversion
+
+RUN aptitude update && aptitude install -y wget bzip2 ca-certificates \
+    libglib2.0-0 libxext6 libsm6 libxrender1 \
+    git mercurial subversion
+
+#RUN apt-get update --fix-missing && apt-get install -y --allow-downgrades wget bzip2 ca-certificates \
+#    libglib2.0-0 libxext6 libsm6 libxrender1 \
+#    perl-base=5.26.1-6 perl liberror-perl git mercurial subversion
+
+
+RUN wget --quiet https://repo.anaconda.com/archive/Anaconda3-2019.03-Linux-x86_64.sh -O ~/anaconda.sh && \
+    /bin/bash ~/anaconda.sh -b -p /opt/conda && \
+    rm ~/anaconda.sh && \
+    ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
+    echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
+    echo "conda activate base" >> ~/.bashrc
+
+RUN apt-get install -y curl grep sed dpkg && \
+    TINI_VERSION=0.19.0 && \
+    curl -L "https://github.com/krallin/tini/releases/download/v${TINI_VERSION}/tini_${TINI_VERSION}.deb" > tini.deb && \
+    dpkg -i tini.deb && \
+    rm tini.deb && \
+    apt-get clean
+
+
+
+#RUN apt-get update && apt-get install -y netcat iproute2 dnsutils vim git build-essential cmake sqlite3 libsqlite3-dev zip unzip \
+#    libboost-dev libboost-system-dev libboost-thread-dev libboost-serialization-dev \
+#    libboost-python-dev libboost-regex-dev libboost-numpy-dev
+
+RUN aptitude install -y netcat iproute2 dnsutils vim git build-essential cmake sqlite3 libsqlite3-dev zip unzip \
+    libboost-dev libboost-system-dev libboost-thread-dev libboost-serialization-dev \
+    libboost-python-dev libboost-regex-dev libboost-numpy-dev
+
+# RUN apt-get update && apt-get install -y graphviz libgraphviz-dev graphviz-dev pkg-config
+RUN aptitude update && aptitude install -y graphviz libgraphviz-dev graphviz-dev pkg-config
+
+
+# ----- my modification -----
+RUN conda config --add channels https://mirrors.ustc.edu.cn/anaconda/pkgs/main/
+RUN conda config --add channels https://mirrors.ustc.edu.cn/anaconda/pkgs/free/
+RUN conda config --add channels https://mirrors.ustc.edu.cn/anaconda/cloud/conda-forge/
+RUN conda config --add channels https://mirrors.ustc.edu.cn/anaconda/cloud/msys2/
+RUN conda config --add channels https://mirrors.ustc.edu.cn/anaconda/cloud/bioconda/
+RUN conda config --add channels https://mirrors.ustc.edu.cn/anaconda/cloud/menpo/
+RUN conda config --add channels https://mirrors.ustc.edu.cn/anaconda/cloud/pytorch/
+RUN conda config --set show_channel_urls yes
+RUN sed '/defaults/d' ~/.condarc
+RUN conda config --set ssl_verify false
+# ----- my modification -----
+
+
+WORKDIR /relnet
+ADD ./environment.yml /relnet/environment.yml
+RUN conda env update --file environment.yml
+
+
+# ----- my modification -----
+RUN apt-get update && apt-get install -y --allow-downgrades perl-base=5.30.0-9build1 liberror-perl git
+
+RUN apt-get autoclean && apt-get update && apt-get upgrade && apt-get -u dist-upgrade && dpkg --configure -a && apt-get -f install
+RUN apt-get update && apt-get upgrade && apt-get autoremove && apt-get install -y -f libc6=2.31-0ubuntu9 gcc-10-base=10-20200411-0ubuntu1
+
+RUN aptitude update && aptitude install -y build-essential
+# ----- my modification -----
+
+
+RUN cd /usr/lib \
+    && git clone https://github.com/VictorDarvariu/pytorch_structure2vec/ \
+    && cd pytorch_structure2vec \
+    && cd s2v_lib \
+    && make -j4
+
+RUN chmod -R 777 /usr/lib/pytorch_structure2vec
+
+ENV PYTHONPATH="/usr/lib/pytorch_structure2vec/s2v_lib:${PYTHONPATH}"
+
+RUN source activate ucfadar-relnet \
+    && pip install torch==0.4.0 -f https://download.pytorch.org/whl/torch_stable.html \
+    && pip install cffi==1.11.2
+
+ARG RN_GNAME
+ARG RN_GID
+
+RUN if ! [[ $(getent group ${RN_GNAME}) ]]; \
+    then groupadd -g ${RN_GID} ${RN_GNAME}; \
+    fi
+
+RUN if ! [[ $(getent passwd relnetmanager) ]]; \
+    then useradd -r -u 12954 --create-home --home-dir /home/relnetmanager -g ${RN_GNAME} relnetmanager; \
+    fi
+
+RUN chgrp -R ${RN_GNAME} /relnet
+RUN chmod -R g+rwx /relnet
+
+# See https://askubuntu.com/questions/909277/avoiding-user-interaction-with-tzdata-when-installing-certbot-in-a-docker-contai
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y dvipng texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra
+
+RUN source activate ucfadar-relnet; python -m ipykernel install --user --name relnet --display-name "python-relnet"
+
+RUN source activate ucfadar-relnet \
+    && pip install geopy==2.0.0 \
+    && pip install pyproj==2.6.1
+
+RUN apt-get update && apt-get install -y libgeos-dev
+RUN source activate ucfadar-relnet \
+    && pip install git+https://github.com/matplotlib/basemap.git@3076ec9470cf7dba523bc94ebe5ae9a990e34d08 \
+    && pip install pillow==7.2.0
+
+USER relnetmanager
+ENV PATH /opt/conda/envs/ucfadar-relnet/bin:$PATH
+ENV RELNET_DEVICE_PLACEMENT CPU
+# ports for Tensorboard, jupyter
+EXPOSE 6006 8888
+CMD ["bash", "/relnet/docker/relnet/start_manager.sh"]

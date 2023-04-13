@@ -30,7 +30,23 @@ RUN apt-get update && apt-get install -y graphviz libgraphviz-dev graphviz-dev p
 
 WORKDIR /relnet
 ADD ./environment.yml /relnet/environment.yml
+
+
+# ----- my modification -----
+#RUN conda config --add channels https://mirrors.ustc.edu.cn/anaconda/pkgs/main/
+#RUN conda config --add channels https://mirrors.ustc.edu.cn/anaconda/pkgs/free/
+#RUN conda config --add channels https://mirrors.ustc.edu.cn/anaconda/cloud/conda-forge/
+#RUN conda config --add channels https://mirrors.ustc.edu.cn/anaconda/cloud/msys2/
+#RUN conda config --add channels https://mirrors.ustc.edu.cn/anaconda/cloud/bioconda/
+#RUN conda config --add channels https://mirrors.ustc.edu.cn/anaconda/cloud/menpo/
+#RUN conda config --add channels https://mirrors.ustc.edu.cn/anaconda/cloud/pytorch/
+#RUN conda config --set show_channel_urls yes
+#RUN sed '/defaults/d' ~/.condarc
+#RUN conda config --set ssl_verify false
+# ----- my modification -----
+
 RUN conda env update --file environment.yml
+
 
 RUN cd /usr/lib \
     && git clone https://github.com/VictorDarvariu/pytorch_structure2vec/ \
@@ -63,7 +79,23 @@ RUN chmod -R g+rwx /relnet
 # See https://askubuntu.com/questions/909277/avoiding-user-interaction-with-tzdata-when-installing-certbot-in-a-docker-contai
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get install -y dvipng texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra
+# ------ my modification ------
+# Add extra souece
+#RUN cp /etc/apt/sources.list /etc/apt/sources.list.bak
+#RUN echo "deb https://mirrors.ustc.edu.cn/ubuntu/ bionic main restricted universe multiverse\n\
+#     deb https://mirrors.ustc.edu.cn/ubuntu/ bionic-updates main restricted universe multiverse\n\
+#     deb https://mirrors.ustc.edu.cn/ubuntu/ bionic-backports main restricted universe multiverse\n\
+#     deb https://mirrors.ustc.edu.cn/ubuntu/ bionic-security main restricted universe multiverse"  \
+#> /etc/apt/sources.list
+# ------ my modification ------
+
+# RUN apt-get update && apt-get install -y dvipng texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra
+
+#------- my modification ------
+#RUN apt-get update --fix-missing && apt-get install -y aptitude
+#RUN aptitude update && aptitude install -y dvipng texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra
+RUN source activate ucfadar-relnet && pip install ipykernel
+#------ my modification ------
 
 RUN source activate ucfadar-relnet; python -m ipykernel install --user --name relnet --display-name "python-relnet"
 
@@ -75,6 +107,25 @@ RUN apt-get update && apt-get install -y libgeos-dev
 RUN source activate ucfadar-relnet \
     && pip install git+https://github.com/matplotlib/basemap.git@3076ec9470cf7dba523bc94ebe5ae9a990e34d08 \
     && pip install pillow==7.2.0
+
+# ------- my modification ------
+RUN source activate ucfadar-relnet \
+    && pip install pytest==5.4.1 \
+    && pip install tensorflow==1.13.1 \
+    && pip install xxhash==1.3.0 \
+    && pip install cachetools==3.1.0 \
+    && pip install objsize==0.3.2 \
+    && pip install multiprocess==0.70.7 \
+    && pip install celery==4.4.2 \
+    && pip install flower==0.9.3 \
+    && pip install dataclasses==0.6 \
+    && pip install tqdm==4.39.0 \
+    && pip install matplotlib==3.1.3 \
+    && pip install pytest==5.4.1 \
+    && pip install pygraphviz==1.5 \
+    && pip install network2tikz==0.1.8 \
+    && pip install Jinja2==2.11.1
+# ------- my modification ------
 
 USER relnetmanager
 ENV PATH /opt/conda/envs/ucfadar-relnet/bin:$PATH

@@ -34,10 +34,10 @@ def get_file_paths():
     return file_paths
 
 if __name__ == '__main__':
-    num_training_steps = 500
-    num_train_graphs = 100
-    num_validation_graphs = 20
-    num_test_graphs = 20
+    num_training_steps = 0
+    num_train_graphs = 0
+    num_validation_graphs = 0
+    num_test_graphs = 100
 
     gen_params = get_gen_params()
     file_paths = get_file_paths()
@@ -60,5 +60,6 @@ if __name__ == '__main__':
 
     agent = RNetDQNAgent(targ_env)
     agent.setup(options, agent.get_default_hyperparameters())
-    agent.train(train_graphs, validation_graphs, num_training_steps)
+    # agent.train(train_graphs, validation_graphs, num_training_steps)
     avg_perf = agent.eval(test_graphs)
+    print(avg_perf)
